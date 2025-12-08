@@ -1,6 +1,6 @@
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users } from "../drizzle/schema";
+import { InsertUser, users, workoutDays, exercises, workoutSessions, exerciseLogs, InsertWorkoutSession, InsertExerciseLog } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -89,4 +89,46 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
-// TODO: add feature queries here as your schema grows.
+// Workout Plan Queries
+export async function getAllWorkoutDays() {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(workoutDays).orderBy(workoutDays.dayNumber);
+}
+
+export async function getExercisesByDayId(dayId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(exercises).where(eq(exercises.workoutDayId, dayId)).orderBy(exercises.orderIndex);
+}
+
+// Progress Tracking Queries
+export async function createWorkoutSession(session: InsertWorkoutSession) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(workoutSessions).values(session);
+  return Number(result[0].insertId);
+}
+
+export async function logExercise(log: InsertExerciseLog) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(exerciseLogs).values(log);
+}
+
+export async function getUserSessions(userId: number, limit = 10) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db
+    .select()
+    .from(workoutSessions)
+    .where(eq(workoutSessions.userId, userId))
+    .orderBy(desc(workoutSessions.sessionDate))
+    .limit(limit);
+}
+
+export async function getSessionLogs(sessionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return await db.select().from(exerciseLogs).where(eq(exerciseLogs.sessionId, sessionId));
+}

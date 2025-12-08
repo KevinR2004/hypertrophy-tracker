@@ -4,13 +4,16 @@ import NotFound from "@/pages/NotFound";
 import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
-import Home from "./pages/Home";
+import WorkoutPlan from "./pages/WorkoutPlan";
+import WorkoutDay from "./pages/WorkoutDay";
+import Progress from "./pages/Progress";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path={"/"} component={WorkoutPlan} />
+      <Route path={"/workout/:dayId"} component={WorkoutDay} />
+      <Route path={"/progress"} component={Progress} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

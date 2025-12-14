@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import WorkoutPlan from "./pages/WorkoutPlan";
 import WorkoutDay from "./pages/WorkoutDay";
 import Progress from "./pages/Progress";
+import Supplements from "./pages/Supplements";
 
 function Router() {
   return (
@@ -14,6 +15,7 @@ function Router() {
       <Route path={"/"} component={WorkoutPlan} />
       <Route path={"/workout/:dayId"} component={WorkoutDay} />
       <Route path={"/progress"} component={Progress} />
+      <Route path={"/supplements"} component={Supplements} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

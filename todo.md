@@ -15,3 +15,4 @@
 - [x] Progress history visualization
 - [x] Responsive design for mobile use in the gym
 - [x] Seed data with 5-day hypertrophy plan
+- [x] Supplementation and nutrition page with protocol for 6-7 PM training

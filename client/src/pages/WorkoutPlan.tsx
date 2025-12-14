@@ -2,7 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { Dumbbell, TrendingUp, Calendar } from "lucide-react";
+import { Dumbbell, TrendingUp, Calendar, Utensils } from "lucide-react";
 
 export default function WorkoutPlan() {
   const { data: workoutDays, isLoading } = trpc.workout.getDays.useQuery();
@@ -35,12 +35,20 @@ export default function WorkoutPlan() {
                 <p className="text-sm text-slate-600 dark:text-slate-400">Plan de Alta Densidad</p>
               </div>
             </div>
-            <Link href="/progress">
-              <Button variant="outline" className="gap-2">
-                <TrendingUp className="w-4 h-4" />
-                Mi Progreso
-              </Button>
-            </Link>
+            <div className="flex gap-2">
+              <Link href="/supplements">
+                <Button variant="outline" className="gap-2">
+                  <Utensils className="w-4 h-4" />
+                  Suplementos
+                </Button>
+              </Link>
+              <Link href="/progress">
+                <Button variant="outline" className="gap-2">
+                  <TrendingUp className="w-4 h-4" />
+                  Mi Progreso
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </header>

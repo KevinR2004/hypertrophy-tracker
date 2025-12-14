@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, desc } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, workoutDays, exercises, workoutSessions, exerciseLogs, InsertWorkoutSession, InsertExerciseLog, meals, InsertMeal, Meal } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -131,6 +131,56 @@ export async function getSessionLogs(sessionId: number) {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(exerciseLogs).where(eq(exerciseLogs.sessionId, sessionId));
+}
+
+export async function getExerciseProgressData(userId: number, exerciseId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  
+  // Get all sessions for this user with logs for the specific exercise
+  const result = await db
+    .select({
+      sessionDate: workoutSessions.sessionDate,
+      weight: exerciseLogs.weight,
+      reps: exerciseLogs.reps,
+      setNumber: exerciseLogs.setNumber,
+    })
+    .from(exerciseLogs)
+    .innerJoin(workoutSessions, eq(exerciseLogs.sessionId, workoutSessions.id))
+    .where(
+      and(
+        eq(workoutSessions.userId, userId),
+        eq(exerciseLogs.exerciseId, exerciseId)
+      )
+    )
+    .orderBy(workoutSessions.sessionDate);
+
+  // Group by session date and calculate max weight and total volume
+  const groupedData: Record<string, { date: Date; maxWeight: number; totalVolume: number; sets: number }> = {};
+  
+  result.forEach((row) => {
+    const dateKey = row.sessionDate.toISOString().split('T')[0];
+    if (!groupedData[dateKey]) {
+      groupedData[dateKey] = {
+        date: row.sessionDate,
+        maxWeight: row.weight,
+        totalVolume: 0,
+        sets: 0,
+      };
+    }
+    
+    // Update max weight if this set has higher weight
+    if (row.weight > groupedData[dateKey].maxWeight) {
+      groupedData[dateKey].maxWeight = row.weight;
+    }
+    
+    // Add to total volume (weight × reps)
+    groupedData[dateKey].totalVolume += row.weight * row.reps;
+    groupedData[dateKey].sets += 1;
+  });
+
+  // Convert to array and sort by date
+  return Object.values(groupedData).sort((a, b) => a.date.getTime() - b.date.getTime());
 }
 
 // Meal tracking functions

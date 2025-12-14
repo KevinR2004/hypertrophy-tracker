@@ -79,6 +79,13 @@ export const appRouter = router({
         const { getSessionLogs } = await import("./db");
         return await getSessionLogs(input.sessionId);
       }),
+
+    getExerciseProgress: protectedProcedure
+      .input(z.object({ exerciseId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getExerciseProgressData } = await import("./db");
+        return await getExerciseProgressData(ctx.user.id, input.exerciseId);
+      }),
   }),
   meals: router({
     create: protectedProcedure

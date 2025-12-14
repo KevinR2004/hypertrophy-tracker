@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
-import { ArrowLeft, Pill, Clock, Coffee, Dumbbell, Moon, Utensils } from "lucide-react";
+import { ArrowLeft, Pill, Clock, Coffee, Dumbbell, Moon, Utensils, BellRing } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 
 export default function Supplements() {
@@ -131,6 +131,12 @@ export default function Supplements() {
                 Protocolo optimizado para entrenamiento 6-7 PM
               </p>
             </div>
+            <Link href="/reminders">
+              <Button variant="outline" className="gap-2">
+                <BellRing className="w-4 h-4" />
+                Recordatorios
+              </Button>
+            </Link>
           </div>
         </div>
       </header>

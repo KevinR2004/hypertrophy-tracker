@@ -1,6 +1,6 @@
-import { desc, eq } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, workoutDays, exercises, workoutSessions, exerciseLogs, InsertWorkoutSession, InsertExerciseLog } from "../drizzle/schema";
+import { InsertUser, users, workoutDays, exercises, workoutSessions, exerciseLogs, InsertWorkoutSession, InsertExerciseLog, meals, InsertMeal, Meal } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
@@ -131,4 +131,49 @@ export async function getSessionLogs(sessionId: number) {
   const db = await getDb();
   if (!db) return [];
   return await db.select().from(exerciseLogs).where(eq(exerciseLogs.sessionId, sessionId));
+}
+
+// Meal tracking functions
+export async function createMeal(meal: InsertMeal): Promise<Meal> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  const result = await db.insert(meals).values(meal);
+  const insertedId = Number(result[0].insertId);
+
+  const inserted = await db.select().from(meals).where(eq(meals.id, insertedId)).limit(1);
+  if (!inserted[0]) {
+    throw new Error("Failed to retrieve inserted meal");
+  }
+  return inserted[0];
+}
+
+export async function getMealsByDate(userId: number, date: Date): Promise<Meal[]> {
+  const db = await getDb();
+  if (!db) {
+    return [];
+  }
+
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return db
+    .select()
+    .from(meals)
+    .where(and(eq(meals.userId, userId), gte(meals.date, startOfDay), lte(meals.date, endOfDay)))
+    .orderBy(desc(meals.createdAt));
+}
+
+export async function deleteMeal(mealId: number): Promise<void> {
+  const db = await getDb();
+  if (!db) {
+    throw new Error("Database not available");
+  }
+
+  await db.delete(meals).where(eq(meals.id, mealId));
 }

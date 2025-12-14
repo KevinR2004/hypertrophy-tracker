@@ -78,7 +78,25 @@ export type WorkoutDay = typeof workoutDays.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type WorkoutSession = typeof workoutSessions.$inferSelect;
 export type ExerciseLog = typeof exerciseLogs.$inferSelect;
-export type InsertWorkoutDay = typeof workoutDays.$inferInsert;
+
+/**
+ * Meals table for tracking daily nutrition
+ */
+export const meals = mysqlTable("meals", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull().references(() => users.id),
+  date: timestamp("date").notNull(),
+  mealType: mysqlEnum("mealType", ["desayuno", "snack1", "almuerzo", "snack2", "pre_entrenamiento", "post_entrenamiento", "cena"]).notNull(),
+  description: text("description").notNull(),
+  protein: int("protein").notNull(), // in grams
+  carbs: int("carbs").notNull(), // in grams
+  fats: int("fats").notNull(), // in grams
+  calories: int("calories").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Meal = typeof meals.$inferSelect;
+export type InsertMeal = typeof meals.$inferInsert;
 export type InsertExercise = typeof exercises.$inferInsert;
 export type InsertWorkoutSession = typeof workoutSessions.$inferInsert;
 export type InsertExerciseLog = typeof exerciseLogs.$inferInsert;

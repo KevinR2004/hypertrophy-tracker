@@ -8,6 +8,7 @@ import WorkoutPlan from "./pages/WorkoutPlan";
 import WorkoutDay from "./pages/WorkoutDay";
 import Progress from "./pages/Progress";
 import Supplements from "./pages/Supplements";
+import Meals from "./pages/Meals";
 
 function Router() {
   return (
@@ -16,6 +17,7 @@ function Router() {
       <Route path={"/workout/:dayId"} component={WorkoutDay} />
       <Route path={"/progress"} component={Progress} />
       <Route path={"/supplements"} component={Supplements} />
+      <Route path={"/meals"} component={Meals} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

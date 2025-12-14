@@ -1,8 +1,8 @@
 import { COOKIE_NAME } from "@shared/const";
+import { z } from "zod";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { z } from "zod";
 
 export const appRouter = router({
     // if you need to use socket.io, read and register route in server/_core/index.ts, all api should start with '/api/' so that the gateway can route correctly
@@ -78,6 +78,40 @@ export const appRouter = router({
       .query(async ({ input }) => {
         const { getSessionLogs } = await import("./db");
         return await getSessionLogs(input.sessionId);
+      }),
+  }),
+  meals: router({
+    create: protectedProcedure
+      .input(
+        z.object({
+          description: z.string(),
+          mealType: z.enum(["desayuno", "snack1", "almuerzo", "snack2", "pre_entrenamiento", "post_entrenamiento", "cena"]),
+          protein: z.number(),
+          carbs: z.number(),
+          fats: z.number(),
+          calories: z.number(),
+          date: z.date(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const { createMeal } = await import("./db");
+        return createMeal({
+          userId: ctx.user.id,
+          ...input,
+        });
+      }),
+    getByDate: protectedProcedure
+      .input(z.object({ date: z.date() }))
+      .query(async ({ ctx, input }) => {
+        const { getMealsByDate } = await import("./db");
+        return getMealsByDate(ctx.user.id, input.date);
+      }),
+    delete: protectedProcedure
+      .input(z.object({ mealId: z.number() }))
+      .mutation(async ({ input }) => {
+        const { deleteMeal } = await import("./db");
+        await deleteMeal(input.mealId);
+        return { success: true };
       }),
   }),
 });

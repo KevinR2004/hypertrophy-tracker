@@ -2,8 +2,8 @@
 
 ## Features to Implement
 
+- [ ] Progress charts with Recharts
 - [ ] Dashboard with weekly progress summary
-- [ ] Advanced progress analytics and charts
 
 ## Completed Features
 
@@ -16,3 +16,5 @@
 - [x] Responsive design for mobile use in the gym
 - [x] Seed data with 5-day hypertrophy plan
 - [x] Supplementation and nutrition page with protocol for 6-7 PM training
+- [x] Rest timer in workout day page with presets (60s, 90s, 120s)
+- [x] Meal tracking with macro goals (Protein: 167g, Carbs: 240g, Fats: 40g, Calories: 2600)

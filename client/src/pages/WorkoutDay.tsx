@@ -3,7 +3,7 @@ import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Dumbbell, Clock, Zap } from "lucide-react";
+import { ArrowLeft, Dumbbell, Clock, Zap, Timer } from "lucide-react";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
+import { RestTimer } from "@/components/RestTimer";
 
 export default function WorkoutDay() {
   const [, params] = useRoute("/workout/:dayId");
@@ -24,6 +25,7 @@ export default function WorkoutDay() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [sessionLogs, setSessionLogs] = useState<Record<number, { setNumber: number; reps: number; weight: number }[]>>({});
+  const [showTimer, setShowTimer] = useState(false);
 
   const createSessionMutation = trpc.progress.createSession.useMutation();
   const logExerciseMutation = trpc.progress.logExercise.useMutation();
@@ -116,10 +118,16 @@ export default function WorkoutDay() {
                 </p>
               </div>
             </div>
-            <Button onClick={handleStartSession} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md gap-2">
-              <Zap className="w-4 h-4" />
-              Iniciar Sesión
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={() => setShowTimer(!showTimer)} variant="outline" className="gap-2">
+                <Timer className="w-4 h-4" />
+                Temporizador
+              </Button>
+              <Button onClick={handleStartSession} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-md gap-2">
+                <Zap className="w-4 h-4" />
+                Iniciar Sesión
+              </Button>
+            </div>
           </div>
         </div>
       </header>
@@ -269,6 +277,9 @@ export default function WorkoutDay() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Rest Timer */}
+      {showTimer && <RestTimer onClose={() => setShowTimer(false)} />}
     </div>
   );
 }

@@ -3,10 +3,11 @@ import { useRoute, Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Dumbbell, Clock, Zap, Timer, Check, Save, ChevronDown, ChevronUp } from "lucide-react";
-import { useState, useEffect } from "react";
+import { ArrowLeft, Dumbbell, Clock, Zap, Timer, Check, Save, ChevronDown, ChevronUp, History, Wifi, WifiOff, StickyNote } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { toast } from "sonner";
@@ -23,7 +24,25 @@ interface ExerciseState {
   logs: ExerciseLog[];
   expanded: boolean;
   completed: boolean;
+  note: string;
 }
+
+interface PendingLog {
+  exerciseId: number;
+  setNumber: number;
+  reps: number;
+  weight: number;
+  timestamp: number;
+}
+
+interface OfflineSession {
+  sessionId: number | null;
+  workoutDayId: number;
+  pendingLogs: PendingLog[];
+  exerciseNotes: Record<number, string>;
+}
+
+const OFFLINE_STORAGE_KEY = "hypertrophy_offline_session";
 
 export default function WorkoutDay() {
   const [, params] = useRoute("/workout/:dayId");
@@ -32,6 +51,9 @@ export default function WorkoutDay() {
 
   const { data: workoutDays } = trpc.workout.getDays.useQuery();
   const { data: exercises, isLoading } = trpc.workout.getExercises.useQuery({ dayId });
+  const { data: lastWeights } = trpc.progress.getLastWeights.useQuery(undefined, {
+    enabled: isAuthenticated,
+  });
 
   const currentDay = workoutDays?.find((d) => d.id === dayId);
 
@@ -39,29 +61,114 @@ export default function WorkoutDay() {
   const [sessionId, setSessionId] = useState<number | null>(null);
   const [exerciseStates, setExerciseStates] = useState<Record<number, ExerciseState>>({});
   const [isSessionActive, setIsSessionActive] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [hasPendingSync, setHasPendingSync] = useState(false);
 
   const createSessionMutation = trpc.progress.createSession.useMutation();
   const logExerciseMutation = trpc.progress.logExercise.useMutation();
+
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      toast.success("Conexión restaurada");
+      syncPendingData();
+    };
+    const handleOffline = () => {
+      setIsOnline(false);
+      toast.warning("Sin conexión - Los datos se guardarán localmente");
+    };
+
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
+
+  // Check for pending offline data on mount
+  useEffect(() => {
+    const offlineData = localStorage.getItem(OFFLINE_STORAGE_KEY);
+    if (offlineData) {
+      setHasPendingSync(true);
+      if (isOnline) {
+        syncPendingData();
+      }
+    }
+  }, [isOnline]);
 
   // Initialize exercise states when exercises load
   useEffect(() => {
     if (exercises) {
       const initialStates: Record<number, ExerciseState> = {};
       exercises.forEach((exercise, index) => {
+        // Pre-fill with last used weight if available
+        const lastWeight = lastWeights?.[exercise.id];
+        
         initialStates[exercise.id] = {
           logs: Array.from({ length: exercise.sets }, (_, i) => ({
             setNumber: i + 1,
             reps: 0,
-            weight: 0,
+            weight: lastWeight?.weight || 0,
             saved: false,
           })),
-          expanded: index === 0, // First exercise expanded by default
+          expanded: index === 0,
           completed: false,
+          note: "",
         };
       });
       setExerciseStates(initialStates);
     }
-  }, [exercises]);
+  }, [exercises, lastWeights]);
+
+  const saveToOfflineStorage = useCallback((data: OfflineSession) => {
+    localStorage.setItem(OFFLINE_STORAGE_KEY, JSON.stringify(data));
+    setHasPendingSync(true);
+  }, []);
+
+  const syncPendingData = useCallback(async () => {
+    const offlineData = localStorage.getItem(OFFLINE_STORAGE_KEY);
+    if (!offlineData) return;
+
+    try {
+      const data: OfflineSession = JSON.parse(offlineData);
+      
+      // If we have pending logs but no session ID, we need to create a session first
+      if (data.pendingLogs.length > 0) {
+        let syncSessionId = data.sessionId;
+        
+        if (!syncSessionId) {
+          const { sessionId: newSessionId } = await createSessionMutation.mutateAsync({
+            workoutDayId: data.workoutDayId,
+            sessionDate: new Date(data.pendingLogs[0].timestamp),
+          });
+          syncSessionId = newSessionId;
+        }
+
+        // Sync all pending logs
+        for (const log of data.pendingLogs) {
+          await logExerciseMutation.mutateAsync({
+            sessionId: syncSessionId,
+            exerciseId: log.exerciseId,
+            setNumber: log.setNumber,
+            reps: log.reps,
+            weight: log.weight,
+          });
+        }
+
+        toast.success(`${data.pendingLogs.length} registros sincronizados`);
+      }
+
+      // Clear offline storage
+      localStorage.removeItem(OFFLINE_STORAGE_KEY);
+      setHasPendingSync(false);
+    } catch (error) {
+      console.error("Error syncing offline data:", error);
+      toast.error("Error al sincronizar datos offline");
+    }
+  }, [createSessionMutation, logExerciseMutation]);
 
   const handleStartSession = async () => {
     if (!isAuthenticated) {
@@ -69,17 +176,29 @@ export default function WorkoutDay() {
       return;
     }
 
-    try {
-      const { sessionId: newSessionId } = await createSessionMutation.mutateAsync({
-        workoutDayId: dayId,
-        sessionDate: new Date(),
-      });
-      setSessionId(newSessionId);
+    if (isOnline) {
+      try {
+        const { sessionId: newSessionId } = await createSessionMutation.mutateAsync({
+          workoutDayId: dayId,
+          sessionDate: new Date(),
+        });
+        setSessionId(newSessionId);
+        setIsSessionActive(true);
+        toast.success("¡Sesión iniciada! Registra tus ejercicios conforme los completes.");
+      } catch (error) {
+        toast.error("Error al iniciar la sesión");
+        console.error(error);
+      }
+    } else {
+      // Start offline session
       setIsSessionActive(true);
-      toast.success("¡Sesión iniciada! Registra tus ejercicios conforme los completes.");
-    } catch (error) {
-      toast.error("Error al iniciar la sesión");
-      console.error(error);
+      saveToOfflineStorage({
+        sessionId: null,
+        workoutDayId: dayId,
+        pendingLogs: [],
+        exerciseNotes: {},
+      });
+      toast.info("Sesión iniciada en modo offline");
     }
   };
 
@@ -95,8 +214,42 @@ export default function WorkoutDay() {
     }));
   };
 
+  const handleUpdateNote = (exerciseId: number, note: string) => {
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId],
+        note,
+      },
+    }));
+
+    // Save note to localStorage for persistence
+    const savedNotes = JSON.parse(localStorage.getItem("exercise_notes") || "{}");
+    savedNotes[exerciseId] = note;
+    localStorage.setItem("exercise_notes", JSON.stringify(savedNotes));
+  };
+
+  // Load saved notes on mount
+  useEffect(() => {
+    const savedNotes = JSON.parse(localStorage.getItem("exercise_notes") || "{}");
+    if (Object.keys(savedNotes).length > 0 && exercises) {
+      setExerciseStates((prev) => {
+        const updated = { ...prev };
+        Object.entries(savedNotes).forEach(([exerciseId, note]) => {
+          if (updated[Number(exerciseId)]) {
+            updated[Number(exerciseId)] = {
+              ...updated[Number(exerciseId)],
+              note: note as string,
+            };
+          }
+        });
+        return updated;
+      });
+    }
+  }, [exercises]);
+
   const handleSaveSet = async (exerciseId: number, setIndex: number) => {
-    if (!sessionId) {
+    if (!isSessionActive) {
       toast.error("Primero inicia una sesión de entrenamiento");
       return;
     }
@@ -107,80 +260,8 @@ export default function WorkoutDay() {
       return;
     }
 
-    try {
-      await logExerciseMutation.mutateAsync({
-        sessionId,
-        exerciseId,
-        setNumber: log.setNumber,
-        reps: log.reps,
-        weight: log.weight,
-      });
-
-      setExerciseStates((prev) => ({
-        ...prev,
-        [exerciseId]: {
-          ...prev[exerciseId],
-          logs: prev[exerciseId].logs.map((l, i) =>
-            i === setIndex ? { ...l, saved: true } : l
-          ),
-        },
-      }));
-
-      toast.success(`Serie ${log.setNumber} guardada`);
-
-      // Check if all sets are saved for this exercise
-      const updatedLogs = exerciseStates[exerciseId].logs.map((l, i) =>
-        i === setIndex ? { ...l, saved: true } : l
-      );
-      const allSetsSaved = updatedLogs.every((l) => l.saved);
-
-      if (allSetsSaved) {
-        setExerciseStates((prev) => ({
-          ...prev,
-          [exerciseId]: {
-            ...prev[exerciseId],
-            completed: true,
-            expanded: false,
-          },
-        }));
-
-        // Auto-expand next exercise
-        if (exercises) {
-          const currentIndex = exercises.findIndex((e) => e.id === exerciseId);
-          const nextExercise = exercises[currentIndex + 1];
-          if (nextExercise) {
-            setExerciseStates((prev) => ({
-              ...prev,
-              [nextExercise.id]: {
-                ...prev[nextExercise.id],
-                expanded: true,
-              },
-            }));
-          }
-        }
-      }
-    } catch (error) {
-      toast.error("Error al guardar la serie");
-      console.error(error);
-    }
-  };
-
-  const handleSaveAllSets = async (exerciseId: number) => {
-    if (!sessionId) {
-      toast.error("Primero inicia una sesión de entrenamiento");
-      return;
-    }
-
-    const logs = exerciseStates[exerciseId]?.logs || [];
-    const unsavedLogs = logs.filter((log, index) => !log.saved && log.reps > 0);
-
-    if (unsavedLogs.length === 0) {
-      toast.error("No hay series para guardar");
-      return;
-    }
-
-    try {
-      for (const log of unsavedLogs) {
+    if (isOnline && sessionId) {
+      try {
         await logExerciseMutation.mutateAsync({
           sessionId,
           exerciseId,
@@ -188,39 +269,141 @@ export default function WorkoutDay() {
           reps: log.reps,
           weight: log.weight,
         });
-      }
 
-      setExerciseStates((prev) => ({
+        markSetAsSaved(exerciseId, setIndex);
+        toast.success(`Serie ${log.setNumber} guardada`);
+      } catch (error) {
+        // If online save fails, save offline
+        saveSetOffline(exerciseId, log);
+        toast.warning("Guardado localmente (sin conexión)");
+      }
+    } else {
+      // Save offline
+      saveSetOffline(exerciseId, log);
+      markSetAsSaved(exerciseId, setIndex);
+      toast.success(`Serie ${log.setNumber} guardada localmente`);
+    }
+  };
+
+  const saveSetOffline = (exerciseId: number, log: ExerciseLog) => {
+    const offlineData = localStorage.getItem(OFFLINE_STORAGE_KEY);
+    const data: OfflineSession = offlineData
+      ? JSON.parse(offlineData)
+      : { sessionId, workoutDayId: dayId, pendingLogs: [], exerciseNotes: {} };
+
+    data.pendingLogs.push({
+      exerciseId,
+      setNumber: log.setNumber,
+      reps: log.reps,
+      weight: log.weight,
+      timestamp: Date.now(),
+    });
+
+    saveToOfflineStorage(data);
+  };
+
+  const markSetAsSaved = (exerciseId: number, setIndex: number) => {
+    setExerciseStates((prev) => {
+      const updatedLogs = prev[exerciseId].logs.map((l, i) =>
+        i === setIndex ? { ...l, saved: true } : l
+      );
+      const allSetsSaved = updatedLogs.every((l) => l.saved);
+
+      return {
         ...prev,
         [exerciseId]: {
           ...prev[exerciseId],
-          logs: prev[exerciseId].logs.map((l) =>
-            l.reps > 0 ? { ...l, saved: true } : l
-          ),
-          completed: true,
-          expanded: false,
+          logs: updatedLogs,
+          completed: allSetsSaved,
+          expanded: allSetsSaved ? false : prev[exerciseId].expanded,
         },
-      }));
+      };
+    });
 
-      toast.success(`¡${unsavedLogs.length} series guardadas!`);
+    // Auto-expand next exercise if all sets saved
+    const state = exerciseStates[exerciseId];
+    const updatedLogs = state.logs.map((l, i) => (i === setIndex ? { ...l, saved: true } : l));
+    const allSetsSaved = updatedLogs.every((l) => l.saved);
 
-      // Auto-expand next exercise
-      if (exercises) {
-        const currentIndex = exercises.findIndex((e) => e.id === exerciseId);
-        const nextExercise = exercises[currentIndex + 1];
-        if (nextExercise) {
-          setExerciseStates((prev) => ({
-            ...prev,
-            [nextExercise.id]: {
-              ...prev[nextExercise.id],
-              expanded: true,
-            },
-          }));
+    if (allSetsSaved && exercises) {
+      const currentIndex = exercises.findIndex((e) => e.id === exerciseId);
+      const nextExercise = exercises[currentIndex + 1];
+      if (nextExercise) {
+        setExerciseStates((prev) => ({
+          ...prev,
+          [nextExercise.id]: {
+            ...prev[nextExercise.id],
+            expanded: true,
+          },
+        }));
+      }
+    }
+  };
+
+  const handleSaveAllSets = async (exerciseId: number) => {
+    if (!isSessionActive) {
+      toast.error("Primero inicia una sesión de entrenamiento");
+      return;
+    }
+
+    const logs = exerciseStates[exerciseId]?.logs || [];
+    const unsavedLogs = logs.filter((log) => !log.saved && log.reps > 0);
+
+    if (unsavedLogs.length === 0) {
+      toast.error("No hay series para guardar");
+      return;
+    }
+
+    let savedCount = 0;
+
+    for (let i = 0; i < logs.length; i++) {
+      const log = logs[i];
+      if (!log.saved && log.reps > 0) {
+        if (isOnline && sessionId) {
+          try {
+            await logExerciseMutation.mutateAsync({
+              sessionId,
+              exerciseId,
+              setNumber: log.setNumber,
+              reps: log.reps,
+              weight: log.weight,
+            });
+            savedCount++;
+          } catch (error) {
+            saveSetOffline(exerciseId, log);
+          }
+        } else {
+          saveSetOffline(exerciseId, log);
+          savedCount++;
         }
       }
-    } catch (error) {
-      toast.error("Error al guardar las series");
-      console.error(error);
+    }
+
+    setExerciseStates((prev) => ({
+      ...prev,
+      [exerciseId]: {
+        ...prev[exerciseId],
+        logs: prev[exerciseId].logs.map((l) => (l.reps > 0 ? { ...l, saved: true } : l)),
+        completed: true,
+        expanded: false,
+      },
+    }));
+
+    toast.success(`¡${savedCount} series guardadas!`);
+
+    // Auto-expand next exercise
+    if (exercises) {
+      const currentIndex = exercises.findIndex((e) => e.id === exerciseId);
+      const nextExercise = exercises[currentIndex + 1];
+      if (nextExercise) {
+        setExerciseStates((prev) => ({
+          ...prev,
+          [nextExercise.id]: {
+            ...prev[nextExercise.id],
+            expanded: true,
+          },
+        }));
+      }
     }
   };
 
@@ -238,6 +421,10 @@ export default function WorkoutDay() {
     const completedCount = Object.values(exerciseStates).filter((s) => s.completed).length;
     const totalCount = exercises?.length || 0;
 
+    if (hasPendingSync && isOnline) {
+      syncPendingData();
+    }
+
     if (completedCount < totalCount) {
       toast.info(`Sesión finalizada. Completaste ${completedCount}/${totalCount} ejercicios.`);
     } else {
@@ -246,6 +433,23 @@ export default function WorkoutDay() {
 
     setIsSessionActive(false);
     setSessionId(null);
+  };
+
+  const useLastWeight = (exerciseId: number) => {
+    const lastWeight = lastWeights?.[exerciseId];
+    if (lastWeight) {
+      setExerciseStates((prev) => ({
+        ...prev,
+        [exerciseId]: {
+          ...prev[exerciseId],
+          logs: prev[exerciseId].logs.map((log) => ({
+            ...log,
+            weight: lastWeight.weight,
+          })),
+        },
+      }));
+      toast.success(`Peso anterior aplicado: ${lastWeight.weight}kg`);
+    }
   };
 
   if (isLoading) {
@@ -288,7 +492,28 @@ export default function WorkoutDay() {
                 </p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {/* Online/Offline indicator */}
+              <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
+                isOnline ? "bg-green-100 text-green-700" : "bg-orange-100 text-orange-700"
+              }`}>
+                {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                {isOnline ? "Online" : "Offline"}
+              </div>
+              
+              {hasPendingSync && (
+                <Button
+                  onClick={syncPendingData}
+                  variant="outline"
+                  size="sm"
+                  className="gap-1 text-orange-600 border-orange-300"
+                  disabled={!isOnline}
+                >
+                  <Save className="w-3 h-3" />
+                  Sincronizar
+                </Button>
+              )}
+
               <Button onClick={() => setShowTimer(!showTimer)} variant="outline" className="gap-2">
                 <Timer className="w-4 h-4" />
                 Temporizador
@@ -346,6 +571,7 @@ export default function WorkoutDay() {
             const state = exerciseStates[exercise.id];
             const isExpanded = state?.expanded ?? false;
             const isCompleted = state?.completed ?? false;
+            const lastWeight = lastWeights?.[exercise.id];
 
             return (
               <Card
@@ -364,7 +590,7 @@ export default function WorkoutDay() {
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="text-sm font-bold text-slate-500 dark:text-slate-400">
                           #{index + 1}
                         </span>
@@ -379,12 +605,26 @@ export default function WorkoutDay() {
                             Superserie
                           </Badge>
                         )}
+                        {/* Last weight indicator */}
+                        {lastWeight && !isCompleted && (
+                          <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
+                            <History className="w-3 h-3 mr-1" />
+                            Último: {lastWeight.weight}kg × {lastWeight.reps}
+                          </Badge>
+                        )}
                       </div>
                       <CardTitle className="text-lg mb-2">{exercise.name}</CardTitle>
                       {exercise.notes && (
                         <p className="text-sm text-slate-600 dark:text-slate-400 mt-2">
                           {exercise.notes}
                         </p>
+                      )}
+                      {/* Show saved note if exists */}
+                      {state?.note && !isExpanded && (
+                        <div className="mt-2 flex items-start gap-1 text-sm text-amber-700 dark:text-amber-400">
+                          <StickyNote className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                          <span className="italic">{state.note}</span>
+                        </div>
                       )}
                     </div>
                     {isSessionActive && (
@@ -418,6 +658,29 @@ export default function WorkoutDay() {
                   {/* Logging Form - Only show when session is active and expanded */}
                   {isSessionActive && isExpanded && (
                     <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-4">
+                      {/* Use last weight button */}
+                      {lastWeight && (
+                        <div className="mb-4 flex items-center justify-between bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                          <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                            <History className="w-4 h-4" />
+                            <span>
+                              Última sesión: <strong>{lastWeight.weight}kg × {lastWeight.reps} reps</strong>
+                              <span className="text-blue-500 ml-2">
+                                ({new Date(lastWeight.date).toLocaleDateString("es-ES")})
+                              </span>
+                            </span>
+                          </div>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => useLastWeight(exercise.id)}
+                            className="text-blue-600 border-blue-300"
+                          >
+                            Usar peso
+                          </Button>
+                        </div>
+                      )}
+
                       <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3">
                         Registrar Series
                       </h4>
@@ -482,6 +745,20 @@ export default function WorkoutDay() {
                             </div>
                           </div>
                         ))}
+                      </div>
+
+                      {/* Notes section */}
+                      <div className="mt-4">
+                        <Label className="text-sm font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1 mb-2">
+                          <StickyNote className="w-4 h-4" />
+                          Notas personales
+                        </Label>
+                        <Textarea
+                          placeholder="Ej: Subir peso próxima vez, dolor en hombro, cambiar agarre..."
+                          value={state?.note || ""}
+                          onChange={(e) => handleUpdateNote(exercise.id, e.target.value)}
+                          className="h-20 resize-none"
+                        />
                       </div>
 
                       {/* Save All Button */}

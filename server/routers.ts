@@ -86,6 +86,11 @@ export const appRouter = router({
         const { getExerciseProgressData } = await import("./db");
         return await getExerciseProgressData(ctx.user.id, input.exerciseId);
       }),
+
+    getLastWeights: protectedProcedure.query(async ({ ctx }) => {
+      const { getLastWeightsByUser } = await import("./db");
+      return await getLastWeightsByUser(ctx.user.id);
+    }),
   }),
   meals: router({
     create: protectedProcedure

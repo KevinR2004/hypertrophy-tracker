@@ -227,3 +227,37 @@ export async function deleteMeal(mealId: number): Promise<void> {
 
   await db.delete(meals).where(eq(meals.id, mealId));
 }
+
+// Get last weight used for each exercise by user
+export async function getLastWeightsByUser(userId: number) {
+  const db = await getDb();
+  if (!db) return {};
+
+  // Get the most recent log for each exercise for this user
+  const result = await db
+    .select({
+      exerciseId: exerciseLogs.exerciseId,
+      weight: exerciseLogs.weight,
+      reps: exerciseLogs.reps,
+      sessionDate: workoutSessions.sessionDate,
+    })
+    .from(exerciseLogs)
+    .innerJoin(workoutSessions, eq(exerciseLogs.sessionId, workoutSessions.id))
+    .where(eq(workoutSessions.userId, userId))
+    .orderBy(desc(workoutSessions.sessionDate), desc(exerciseLogs.setNumber));
+
+  // Group by exercise and get the most recent entry
+  const lastWeights: Record<number, { weight: number; reps: number; date: Date }> = {};
+  
+  result.forEach((row) => {
+    if (!lastWeights[row.exerciseId]) {
+      lastWeights[row.exerciseId] = {
+        weight: row.weight,
+        reps: row.reps,
+        date: row.sessionDate,
+      };
+    }
+  });
+
+  return lastWeights;
+}

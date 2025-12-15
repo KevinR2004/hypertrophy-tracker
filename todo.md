@@ -111,3 +111,6 @@
 ## 🔧 Bug Fixes / Improvements in Progress
 
 - [x] Permitir registro de ejercicios individualmente (guardar progreso por ejercicio conforme se completa, no toda la sesión de una vez)
+- [x] Historial de pesos anteriores: Mostrar el peso usado en la sesión anterior para cada ejercicio
+- [x] Modo offline: Guardar datos localmente si se pierde conexión y sincronizar al reconectar
+- [x] Notas por ejercicio: Campo para escribir notas personales en cada ejercicio

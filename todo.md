@@ -106,3 +106,8 @@
 - Increase weight when all sets completed at high end of rep range
 - Focus areas: Legs, Chest, Arms, Back
 - Calisthenics skills: Full Planche, Front Lever, HSPU progression
+
+
+## 🔧 Bug Fixes / Improvements in Progress
+
+- [x] Permitir registro de ejercicios individualmente (guardar progreso por ejercicio conforme se completa, no toda la sesión de una vez)

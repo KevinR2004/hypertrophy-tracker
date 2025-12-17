@@ -1,4 +1,4 @@
-import { eq, desc, and, gte, lte, sql } from "drizzle-orm";
+import { eq, desc, and, gte, lte, sql, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, workoutDays, exercises, workoutSessions, exerciseLogs, InsertWorkoutSession, InsertExerciseLog, meals, InsertMeal, Meal } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -260,4 +260,44 @@ export async function getLastWeightsByUser(userId: number) {
   });
 
   return lastWeights;
+}
+
+// Update session duration
+export async function updateSessionDuration(sessionId: number, durationMinutes: number) {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.update(workoutSessions).set({ durationMinutes }).where(eq(workoutSessions.id, sessionId));
+}
+
+// Get previous session for comparison
+export async function getPreviousSession(userId: number, workoutDayId: number, currentSessionDate: Date) {
+  const db = await getDb();
+  if (!db) return null;
+
+  const result = await db
+    .select()
+    .from(workoutSessions)
+    .where(
+      and(
+        eq(workoutSessions.userId, userId),
+        eq(workoutSessions.workoutDayId, workoutDayId),
+        lt(workoutSessions.sessionDate, currentSessionDate)
+      )
+    )
+    .orderBy(desc(workoutSessions.sessionDate))
+    .limit(1);
+
+  return result[0] || null;
+}
+
+// Get exercise logs for a session
+export async function getSessionExerciseLogs(sessionId: number) {
+  const db = await getDb();
+  if (!db) return [];
+
+  return await db
+    .select()
+    .from(exerciseLogs)
+    .where(eq(exerciseLogs.sessionId, sessionId))
+    .orderBy(exerciseLogs.exerciseId, exerciseLogs.setNumber);
 }

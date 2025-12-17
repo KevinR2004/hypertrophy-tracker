@@ -59,6 +59,7 @@ export const workoutSessions = mysqlTable("workout_sessions", {
   userId: int("user_id").notNull(),
   workoutDayId: int("workout_day_id").notNull(),
   sessionDate: timestamp("session_date").notNull(),
+  durationMinutes: int("duration_minutes"), // Total session duration in minutes
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -71,6 +72,7 @@ export const exerciseLogs = mysqlTable("exercise_logs", {
   reps: int("reps").notNull(), // Actual reps completed
   weight: int("weight").notNull(), // Weight in kg (stored as integer, e.g., 50 = 50kg)
   rir: int("rir"), // Actual RIR (optional)
+  rpe: int("rpe"), // Rate of Perceived Exertion (1-10) for the exercise
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

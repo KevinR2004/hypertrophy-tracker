@@ -114,3 +114,6 @@
 - [x] Historial de pesos anteriores: Mostrar el peso usado en la sesión anterior para cada ejercicio
 - [x] Modo offline: Guardar datos localmente si se pierde conexión y sincronizar al reconectar
 - [x] Notas por ejercicio: Campo para escribir notas personales en cada ejercicio
+- [x] Temporizador de entrenamiento total: Cronómetro que mida la duración de cada sesión
+- [x] Registro de RPE/Fatiga: Selector de nivel de esfuerzo percibido (1-10) por ejercicio
+- [x] Comparación de sesiones: Vista que compare sesión actual vs anterior del mismo día

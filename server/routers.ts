@@ -91,6 +91,29 @@ export const appRouter = router({
       const { getLastWeightsByUser } = await import("./db");
       return await getLastWeightsByUser(ctx.user.id);
     }),
+
+    updateDuration: protectedProcedure
+      .input(z.object({ sessionId: z.number(), durationMinutes: z.number() }))
+      .mutation(async ({ input }) => {
+        const { updateSessionDuration } = await import("./db");
+        await updateSessionDuration(input.sessionId, input.durationMinutes);
+      }),
+
+    getPreviousSession: protectedProcedure
+      .input(z.object({ workoutDayId: z.number(), currentSessionDate: z.date() }))
+      .query(async ({ ctx, input }) => {
+        const { getPreviousSession } = await import("./db");
+        return await getPreviousSession(ctx.user.id, input.workoutDayId, input.currentSessionDate);
+      }),
+
+    getSessionComparison: protectedProcedure
+      .input(z.object({ currentSessionId: z.number(), previousSessionId: z.number() }))
+      .query(async ({ input }) => {
+        const { getSessionExerciseLogs } = await import("./db");
+        const currentLogs = await getSessionExerciseLogs(input.currentSessionId);
+        const previousLogs = await getSessionExerciseLogs(input.previousSessionId);
+        return { currentLogs, previousLogs };
+      }),
   }),
   meals: router({
     create: protectedProcedure

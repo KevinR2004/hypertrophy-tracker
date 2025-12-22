@@ -11,15 +11,17 @@ import Supplements from "./pages/Supplements";
 import SupplementReminders from "./pages/SupplementReminders";
 import Meals from "./pages/Meals";
 
+
 function Router() {
   return (
     <Switch>
       <Route path={"/"} component={WorkoutPlan} />
       <Route path={"/workout/:dayId"} component={WorkoutDay} />
       <Route path={"/progress"} component={Progress} />
-       <Route path="/supplements" component={Supplements} />
+      <Route path="/supplements" component={Supplements} />
       <Route path="/reminders" component={SupplementReminders} />
       <Route path={"/meals"} component={Meals} />
+
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

@@ -301,3 +301,5 @@ export async function getSessionExerciseLogs(sessionId: number) {
     .where(eq(exerciseLogs.sessionId, sessionId))
     .orderBy(exerciseLogs.exerciseId, exerciseLogs.setNumber);
 }
+
+

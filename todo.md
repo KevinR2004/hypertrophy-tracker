@@ -117,3 +117,12 @@
 - [x] Temporizador de entrenamiento total: Cronómetro que mida la duración de cada sesión
 - [x] Registro de RPE/Fatiga: Selector de nivel de esfuerzo percibido (1-10) por ejercicio
 - [x] Comparación de sesiones: Vista que compare sesión actual vs anterior del mismo día
+
+
+## 🏠 Plan de Entrenamiento en Casa (Vacaciones)
+
+- [ ] Diseñar plan de 2 semanas de entrenamiento en casa sin equipamiento
+- [ ] Agregar tabla de planes de vacaciones a la base de datos
+- [ ] Crear página de selección entre plan de gym y plan de vacaciones
+- [ ] Adaptar recordatorios de suplementos para plan de vacaciones
+- [ ] Integrar plan de vacaciones en la navegación principal

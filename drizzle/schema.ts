@@ -103,7 +103,6 @@ export type InsertExercise = typeof exercises.$inferInsert;
 export type InsertWorkoutSession = typeof workoutSessions.$inferInsert;
 export type InsertExerciseLog = typeof exerciseLogs.$inferInsert;
 
-
 /**
  * Progress Logs Table
  * Stores body metrics (weight, measurements) and photo URLs for aesthetic tracking.

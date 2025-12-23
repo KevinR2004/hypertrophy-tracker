@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -102,3 +102,33 @@ export type InsertMeal = typeof meals.$inferInsert;
 export type InsertExercise = typeof exercises.$inferInsert;
 export type InsertWorkoutSession = typeof workoutSessions.$inferInsert;
 export type InsertExerciseLog = typeof exerciseLogs.$inferInsert;
+
+
+/**
+ * Progress Logs Table
+ * Stores body metrics (weight, measurements) and photo URLs for aesthetic tracking.
+ */
+export const progressLogs = mysqlTable("progress_logs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("user_id").notNull(), // Relación con users.id
+  date: timestamp("created_at").defaultNow().notNull(),
+  
+  // Métricas Corporales
+  weight: decimal("weight", { precision: 5, scale: 2 }).notNull(), // Ej: 80.50
+  
+  // Medidas (Opcionales - Bodybuilding focus)
+  chest: decimal("chest", { precision: 5, scale: 2 }),
+  waist: decimal("waist", { precision: 5, scale: 2 }),
+  arms: decimal("arms", { precision: 5, scale: 2 }),
+  legs: decimal("legs", { precision: 5, scale: 2 }),
+  
+  // Fotos (Guardamos la URL, no la imagen pesada)
+  frontPhoto: varchar("front_photo", { length: 500 }),
+  backPhoto: varchar("back_photo", { length: 500 }),
+  sidePhoto: varchar("side_photo", { length: 500 }),
+  
+  notes: text("notes"),
+});
+
+export type ProgressLog = typeof progressLogs.$inferSelect;
+export type InsertProgressLog = typeof progressLogs.$inferInsert;
